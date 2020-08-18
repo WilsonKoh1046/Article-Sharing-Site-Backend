@@ -13,14 +13,14 @@ class Users {
 
     async createUser(name, password, email) {
         try {
-            let check = await pool.query(`select name from users where email = '${email}'`);
+            let check = await this._DB.query(`select name from users where email = '${email}'`);
             if (check.rows.length > 0) {
                 return {"Status": 401, "Message": "User already exists"};
             }
     
             let hashedPassword = await this._passwordHasher(password);
     
-            let user = await pool.query(
+            let user = await this._DB.query(
                 `insert into users (name, password, email) 
                 values ('${name}', '${hashedPassword}', '${email}')
                 returning *`
@@ -33,7 +33,7 @@ class Users {
 
     async retrieveUsers() {
         try {
-            let users = await pool.query(
+            let users = await this._DB.query(
                 `select * from users`
                 );
             return users.rows;
@@ -44,7 +44,7 @@ class Users {
 
     async retrieveOneUser(email) {
         try {
-            let user = await pool.query(
+            let user = await this._DB.query(
                 `select id, name, email from users 
                 where email = '${email}'`
                 );
@@ -57,7 +57,7 @@ class Users {
     async updateUser(id, name, password, email) {
         try {
             let hashedPassword = await this._passwordHasher(password);
-            let user = await pool.query(
+            let user = await this._DB.query(
                 `update users 
                 set name = '${name}', password = '${hashedPassword}', email = '${email}'
                 where id = ${id}
@@ -71,7 +71,7 @@ class Users {
 
     async deleteUser(id, email) {
         try {
-            let user = await pool.query(
+            let user = await this._DB.query(
                 `delete from users 
                 where id = ${id} and email = '${email}'
                 returning *`
@@ -84,7 +84,7 @@ class Users {
 
     async signInUser(password, email) {
         try {
-            let user = await pool.query(
+            let user = await this._DB.query(
                 `select * from users where email = '${email}'`
                 );
             if (user.rows.length === 0) {
