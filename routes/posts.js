@@ -1,54 +1,79 @@
 const express = require("express");
-const router = express();
+const router = express.Router();
 const posts = require("../services/posts");
+const authorizer = require("../middlewares/authorizer");
 
 router.get("/", async (req, res) => {
     try {
         let result = await posts.getAllPosts();
-        res.status(200).json(result);
+        res.status(result.Status).json(result.Data);
     } catch(err) {
-        console.log(err);
+        res.status(500).json({"Message": "Server error"});
     }
 })
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", authorizer, async (req, res) => {
+    const email = req.email;
+    const id = parseInt(req.params.id);
     try {
-        const id = parseInt(req.params.id);
-        let result = await posts.getOnePost(id);
-        res.status(200).json(result);
+        let result = await posts.getPostById(id, email);
+        if (result.Status === 401) {
+            res.status(result.Status).json({"Message": result.Message});
+        }
+        res.status(result.Status).json({"Data": result.Data});
     } catch(err) {
-        console.log(err);
+        res.status(500).json({"Message": "Server error"});
     }
 })
 
-router.post("/", async (req, res) => {
+router.get("/my-posts/:id", authorizer, async (req, res) => {
+    const id = parseInt(req.params.id);
     try {
-        const { name, title, content, content_genre } = req.body;
-        await posts.createPost(name, title, content, content_genre);
-        res.status(201).json({"message": "Post successfully added"});
+        let result = await posts.getAllMyPosts(id);
+        res.status(result.Status).json({"Data": result.Data});
     } catch(err) {
-        console.log(err);
+        res.status(500).json({"Message": "Server error"});
+    }
+})
+
+router.post("/:id", authorizer, async (req, res) => {
+    const user_id = parseInt(req.params.id);
+    const email = req.email;
+    const { title, content, content_genre } = req.body;
+    try {
+        let result = await posts.createPost(title, content, content_genre, user_id, email);
+        res.status(result.Status).json({"Message": `Post with id ${result.Message.id} successfully added`});
+    } catch(err) {
+        res.status(500).json({"Message": "Server error"});
     }
 })
 
 router.put("/:id", async (req, res) => {
+    const email = req.email;
+    const id = parseInt(req.params.id);
+    const { title, content, content_genre } = req.body;
     try {
-        const id = parseInt(req.params.id);
-        const { name, title, content, content_genre } = req.body;
-        await posts.updatePost(id, name, title, content, content_genre);
-        res.status(201).json({"message": `Post with id ${id} is successfully updated`});
+        let result = await posts.updatePost(id, title, content, content_genre, email);
+        if (result.Status === 401) {
+            res.status(result.Status).json({"Message": result.Message});
+        }
+        res.status(result.Status).json({"Message": `Post with id ${result.Data.id} is successfully updated`});
     } catch(err) {
-        console.log(err);
+        res.status(500).json({"Message": "Server error"});
     }
 })
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", authorizer, async (req, res) => {
+    const email = req.email;
+    const id = parseInt(req.params.id);
     try {
-        const id = parseInt(req.params.id);
-        await posts.deletePost(id);
-        res.status(202).json({"message": `Post with id: ${id} is successfully deleted`});
+        let result = await posts.deletePost(id, email);
+        if (result.Status === 401) {
+            res.status(result.Status).json({"Message": result.Message});
+        }
+        res.status(result.Status).json({"Message": `Post with id: ${result.Data.id} is successfully deleted`});
     } catch(err) {
-        console.log(err);
+        res.status(500).json({"Message": "Server error"});
     }
 })
 
