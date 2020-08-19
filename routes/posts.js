@@ -77,4 +77,15 @@ router.delete("/:id", authorizer, async (req, res) => {
     }
 })
 
+router.put("/vote/:id", authorizer, async (req, res) => {
+    const { personal_id, action } = req.body;
+    const targeted_id = req.params.id;
+    try {
+        let result = await posts.vote(personal_id, targeted_id, action);
+        res.status(result.Status).json({"Message": result.Message});
+    } catch(err) {
+        res.status(500).json({"Message": "Server error"});
+    }
+})
+
 module.exports = router;

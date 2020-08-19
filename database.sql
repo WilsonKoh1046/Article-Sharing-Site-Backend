@@ -20,8 +20,6 @@ CREATE TABLE posts
     content_genre genre NOT NULL,
     content text NOT NULL,
     user_id integer,
-    upvote integer NOT NULL DEFAULT 0,
-    downvote integer NOT NULL DEFAULT 0,
     created_date timestamp without time zone NOT NULL,
     CONSTRAINT user_id FOREIGN KEY (user_id)
         REFERENCES users (id) MATCH SIMPLE
@@ -31,3 +29,9 @@ CREATE TABLE posts
 WITH (
     OIDS = FALSE
 );
+
+ALTER TABLE posts
+    ADD COLUMN upvote integer[] DEFAULT ARRAY[]::integer[];
+
+ALTER TABLE posts
+    ADD COLUMN downvote integer[] DEFAULT ARRAY[]::integer[];

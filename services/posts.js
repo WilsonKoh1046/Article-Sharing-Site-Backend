@@ -26,6 +26,45 @@ class Posts {
         }
     }
 
+    _convertVoteAction(action) {
+        return action === 'downvote' ? 'upvote' : 'downvote';
+    }
+
+    async _checkIfClicked(personal_id, target_id, action) {
+        try {
+            let output = await this._DB.query(
+                `select 
+                    case 
+                        when (select count(*) from posts where (${personal_id} = any(${action})) and id = ${target_id}) = 0 then 'NO'
+                        else 'YES'
+                    end
+                from posts
+                where id = ${target_id}`
+                );
+            return output.rows[0].case === 'NO';
+        } catch(err) {
+            console.log(err);
+        }
+    }
+
+    async _checkOppositeVote(personal_id, target_id, action) {
+        let oppAction = this._convertVoteAction(action);
+        try {
+            let output = await this._DB.query(
+                `select
+                    case 
+                        when (select count(*) from posts where (${personal_id} = any(${oppAction})) and id = ${target_id}) = 0 then 'NO'
+                        else 'YES'
+                    end
+                from posts
+                where id = ${target_id}`
+                );
+            return output.rows[0].case === 'NO';
+        } catch(err) {
+            console.log(err);
+        }
+    }
+
     async createPost(title, content, content_genre, user_id, email) {
         try {
             let post = await this._DB.query(
@@ -42,7 +81,7 @@ class Posts {
     async getAllPosts() {
         try {
             let posts = await this._DB.query(
-                `select p.title, p.content, p.content_genre, p.created_date, u.name from posts p
+                `select p.title, p.content, p.content_genre, p.upvote, p.downvote, p.created_date, u.name from posts p
                 left join users u
                 on p.user_id = u.id
                 `);
@@ -109,6 +148,37 @@ class Posts {
                 returning *`
                 );
             return {"Status": 202, "Data": post.rows[0]};
+        } catch(err) {
+            console.log(err);
+        }
+    }
+
+    async vote(personal_id, target_id, action) {
+        try {
+            let check1 = await this._checkIfClicked(personal_id, target_id, action);
+            if (check1 === false) {
+                return {"Status": 403, "Message": `Error, user ${personal_id} already ${action}d post ${target_id}`};
+            }
+            let oppAction = this._convertVoteAction(action);
+            let check2 = await this._checkOppositeVote(personal_id, target_id, action);
+            // Remove the vote at the opposite if a vote was casted
+            if (check2 === false) {
+                await this._DB.query(
+                    `update posts
+                    set ${oppAction} = array_remove(${oppAction}, ${personal_id})
+                    where id = ${target_id}`
+                    );
+            }
+            let statement = await this._DB.query(
+                `update posts
+                set ${action} = array_append(${action}, ${personal_id})
+                where id = ${target_id}
+                returning array_length(${action}, 1)`
+                );
+            return {
+                "Status": 201, 
+                "Message": `User ${personal_id} ${action}d post ${target_id}, ${action} count: ${statement.rows[0].array_length}`
+            };
         } catch(err) {
             console.log(err);
         }
