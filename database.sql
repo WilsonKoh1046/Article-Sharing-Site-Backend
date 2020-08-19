@@ -1,3 +1,6 @@
+CREATE TYPE genre AS ENUM
+    ('comedy', 'horror', 'romantic', 'fiction', 'thriller', 'family', 'gaming', 'lifestyle', 'knowledge');
+
 CREATE TABLE users
 (
     id serial NOT NULL,
