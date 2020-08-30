@@ -1,31 +1,30 @@
-const pool = require("../config/database");
+const Users = require("../models/Users");
 const jwtGenerator = require("../utils/jwtGenerator");   
 const passwordHasher = require("../utils/passwordHasher");
 const passwordChecker = require("../utils/passwordChecker");
 
-class Users {
-    constructor() {
-        this._DB = pool;
-        this._jwtGenerator = jwtGenerator;
-        this._passwordHasher = passwordHasher;
-        this._passwordChecker = passwordChecker;
-    }
+class UsersServices {
+    constructor() {};
 
     async createUser(name, password, email) {
         try {
-            let check = await this._DB.query(`select name from users where email = '${email}'`);
-            if (check.rows.length > 0) {
+            let check = await Users.findAll({
+                where: {
+                    email: email
+                }
+            });
+            if (check.length > 0) {
                 return {"Status": 401, "Message": "User already exists"};
             }
     
-            let hashedPassword = await this._passwordHasher(password);
-    
-            let user = await this._DB.query(
-                `insert into users (name, password, email) 
-                values ('${name}', '${hashedPassword}', '${email}')
-                returning *`
-                );
-            return {"Status": 201, "Message": user.rows[0]};
+            let hashedPassword = await passwordHasher(password);
+
+            let user = await Users.create({
+                name: name,
+                password: hashedPassword,
+                email: email
+            })
+            return {"Status": 201, "Message": user};
         } catch(err) {
             console.log(err);
         }
@@ -33,10 +32,8 @@ class Users {
 
     async retrieveUsers() {
         try {
-            let users = await this._DB.query(
-                `select * from users`
-                );
-            return users.rows;
+            let users = await Users.findAll();
+            return users;
         } catch(err) {
             console.log(err);
         }
@@ -44,11 +41,13 @@ class Users {
 
     async retrieveOneUser(email) {
         try {
-            let user = await this._DB.query(
-                `select id, name, email from users 
-                where email = '${email}'`
-                );
-            return user.rows[0];
+            let user = await Users.findOne({
+                attributes: ["id", "name", "email"],
+                where: {
+                    email: email
+                }
+            })
+            return user;
         } catch(err) {
             console.log(err);
         }
@@ -56,14 +55,17 @@ class Users {
 
     async updateUser(id, name, password, email) {
         try {
-            let hashedPassword = await this._passwordHasher(password);
-            let user = await this._DB.query(
-                `update users 
-                set name = '${name}', password = '${hashedPassword}', email = '${email}'
-                where id = ${id}
-                returning *`
-                );
-            return user.rows[0];
+            let hashedPassword = await passwordHasher(password);
+            await Users.update({
+                name: name,
+                password: hashedPassword,
+                email: email
+            }, {
+                where: {
+                    id: id
+                }
+            })
+            return {"Message": `user with id ${id} is successfully updated`};
         } catch(err) {
             console.log(err);
         }
@@ -71,12 +73,11 @@ class Users {
 
     async deleteUser(id, email) {
         try {
-            let user = await this._DB.query(
-                `delete from users 
-                where id = ${id} and email = '${email}'
-                returning *`
-                );
-            return user.rows[0];
+            await Users.destroy({
+                id: id,
+                email: email
+            })
+            return {"Message": `user with id ${id} is successfully deleted`};
         } catch(err) {
             console.log(err);
         }
@@ -84,20 +85,22 @@ class Users {
 
     async signInUser(password, email) {
         try {
-            let user = await this._DB.query(
-                `select * from users where email = '${email}'`
-                );
-            if (user.rows.length === 0) {
+            let user = await Users.findOne({
+                where: {
+                    email: email
+                }
+            })
+            if (user === null) {
                 return {"Status": 401, "Message": "User not found"};
             }
     
-            const decodedPassword = await this._passwordChecker(password, user.rows[0].password);
+            const decodedPassword = await passwordChecker(password, user.password);
     
             if (!decodedPassword) {
                 return {"Status": 401, "Message": "Invalid Password"};
             }
             
-            const token = await this._jwtGenerator(user.rows[0].email);
+            const token = await jwtGenerator(user.email);
             return {"Status": 201, "Token": token};
         } catch(err) {
             console.log(err);
@@ -105,4 +108,4 @@ class Users {
     }
 }
 
-module.exports = new Users();
+module.exports = new UsersServices();

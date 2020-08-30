@@ -1,5 +1,5 @@
 const JWT = require("jsonwebtoken");
-const config = require("../config/configuration");
+const { expiresIn, secretKey } = require("../config/configuration");
 
 module.exports = (user_email) => {
     let claims = {
@@ -7,11 +7,11 @@ module.exports = (user_email) => {
     }
 
     let option = {
-        expiresIn: config.expiresIn
+        expiresIn: expiresIn
     }
     return new Promise((resolve, reject) => {
         try {
-            let token = JWT.sign(claims, config.secretKey, option);
+            let token = JWT.sign(claims, secretKey, option);
             resolve(token);
         } catch(err) {
             reject(err);

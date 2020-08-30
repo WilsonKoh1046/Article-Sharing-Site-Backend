@@ -40,7 +40,8 @@ router.get('/my-info', authorizer, async (req, res) => {
 })
 
 router.put('/update-my-info', authorizer, async (req, res) => {
-    const { id, name, password, email } = req.body;
+    const email = req.email;
+    const { id, name, password } = req.body;
     try {
         let updatedInfo = await users.updateUser(id, name, password, email);
         res.status(201).json(updatedInfo);

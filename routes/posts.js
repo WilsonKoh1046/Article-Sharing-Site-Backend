@@ -41,7 +41,7 @@ router.post("/:id", authorizer, async (req, res) => {
     const email = req.email;
     const { title, content, content_genre } = req.body;
     try {
-        let result = await posts.createPost(title, content, content_genre, user_id, email);
+        let result = await posts.createPost(title, content, content_genre, user_id);
         res.status(result.Status).json({"Message": `Post with id ${result.Message.id} successfully added`});
     } catch(err) {
         res.status(500).json({"Message": "Server error"});

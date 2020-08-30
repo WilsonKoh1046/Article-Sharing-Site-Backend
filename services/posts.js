@@ -1,24 +1,24 @@
-const pool = require("../config/database");
+const { QueryTypes } = require("sequelize");
+const { Posts, sequelize } = require("../models/Posts");
 
 /*
 content genres:
 'comedy', 'horror', 'romantic', 'fiction', 'thriller', 'family', 'gaming', 'lifestyle', 'knowledge'
 */
 
-class Posts {
+class PostsServices {
 
-    constructor() {
-        this._DB = pool;
-    }
+    constructor() {};
 
     async _checkIfBelong(post_id, email) {
         try {
-            let check = await this._DB.query(
+            let check = await sequelize.query(
                 `select * from posts p
                 inner join users u
                 on p.user_id = u.id
                 where p.user_id = ${post_id}
-                and u.email = '${email}'`
+                and u.email = '${email}'`,
+                {type: QueryTypes.SELECT} 
                 );
             return check.rows.length > 0;
         } catch(err) {
@@ -32,16 +32,17 @@ class Posts {
 
     async _checkIfClicked(personal_id, target_id, action) {
         try {
-            let output = await this._DB.query(
+            let output = await sequelize.query(
                 `select 
                     case 
                         when (select count(*) from posts where (${personal_id} = any(${action})) and id = ${target_id}) = 0 then 'NO'
                         else 'YES'
                     end
                 from posts
-                where id = ${target_id}`
+                where id = ${target_id}`,
+                {type: QueryTypes.SELECT}
                 );
-            return output.rows[0].case === 'NO';
+            return output[0].case === 'NO';
         } catch(err) {
             console.log(err);
         }
@@ -50,29 +51,31 @@ class Posts {
     async _checkOppositeVote(personal_id, target_id, action) {
         let oppAction = this._convertVoteAction(action);
         try {
-            let output = await this._DB.query(
+            let output = await sequelize.query(
                 `select
                     case 
                         when (select count(*) from posts where (${personal_id} = any(${oppAction})) and id = ${target_id}) = 0 then 'NO'
                         else 'YES'
                     end
                 from posts
-                where id = ${target_id}`
+                where id = ${target_id}`,
+                {type: QueryTypes.SELECT}
                 );
-            return output.rows[0].case === 'NO';
+            return output[0].case === 'NO';
         } catch(err) {
             console.log(err);
         }
     }
 
-    async createPost(title, content, content_genre, user_id, email) {
+    async createPost(title, content, content_genre, user_id) {
         try {
-            let post = await this._DB.query(
-                `insert into posts (title, content, content_genre, user_id, created_date)
-                values ('${title}', '${content}', '${content_genre}', '${user_id}', current_timestamp)
-                returning *`
-                );
-            return {"Status": 201, "Message": post.rows[0]};
+            let post = await Posts.create({
+                title: title,
+                content: content,
+                content_genre: content_genre,
+                user_id: user_id
+            })
+            return {"Status": 201, "Message": post};
         } catch(err) {
             console.log(err);
         }
@@ -80,12 +83,13 @@ class Posts {
 
     async getAllPosts() {
         try {
-            let posts = await this._DB.query(
+            let posts = await sequelize.query(
                 `select p.title, p.content, p.content_genre, p.upvote, p.downvote, p.created_date, u.name from posts p
                 left join users u
                 on p.user_id = u.id
-                `);
-            return {"Status": 200, "Data": posts.rows};
+                `, 
+                {type: QueryTypes.SELECT});
+            return {"Status": 200, "Data": posts};
         } catch(err) {
             console.log(err);
         }
@@ -96,11 +100,12 @@ class Posts {
             if (!this._checkIfBelong(id, email)) {
                 return {"Status": 401, "Message": "Item not found"};
             }
-            let post = await this._DB.query(
-                `select * from posts
-                where id = ${id}`
-                );
-            return {"Status": 200, "Data": post.rows[0]};
+            let post = await Posts.findOne({
+                where: {
+                    id: id
+                }
+            });
+            return {"Status": 200, "Data": post};
         } catch(err) {
             console.log(err);
         }
@@ -108,11 +113,12 @@ class Posts {
 
     async getAllMyPosts(id) {
         try {
-            let posts = await this._DB.query(
-                `select * from posts
-                where user_id = ${id}`
-                );
-            return {"Status": 200, "Data": posts.rows};
+            let posts = await Posts.findAll({
+                where: {
+                    user_id: id
+                }
+            });
+            return {"Status": 200, "Data": posts};
         } catch(err) {
             console.log(err);
         }
@@ -123,15 +129,16 @@ class Posts {
             if (!this._checkIfBelong(id, email)) {
                 return {"Status": 401, "Message": "Item not found"};
             }
-            let post = await this._DB.query(
-                `update posts
-                set title = '${title}',
-                content = '${content}',
-                content_genre = '${content_genre}'
-                where id = ${id}
-                returning *`
-                );
-            return {"Status": 200, "Data": post.rows[0]};
+            let post = await Posts.update({
+                title: title,
+                content: content,
+                content_genre: content_genre
+            }, {
+                where: {
+                    id: id    
+                }
+            })
+            return {"Status": 200, "Data": post};
         } catch(err) {
             console.log(err);
         }
@@ -142,12 +149,10 @@ class Posts {
             if (!this._checkIfBelong(id, email)) {
                 return {"Status": 401, "Message": "Item not found"};
             }
-            let post = await this._DB.query(
-                `delete from posts
-                where id = ${id}
-                returning *`
-                );
-            return {"Status": 202, "Data": post.rows[0]};
+            let post = await Posts.destroy({
+                id: id
+            });
+            return {"Status": 202, "Data": post};
         } catch(err) {
             console.log(err);
         }
@@ -163,21 +168,23 @@ class Posts {
             let check2 = await this._checkOppositeVote(personal_id, target_id, action);
             // Remove the vote at the opposite if a vote was casted
             if (check2 === false) {
-                await this._DB.query(
+                await sequelize.query(
                     `update posts
                     set ${oppAction} = array_remove(${oppAction}, ${personal_id})
-                    where id = ${target_id}`
+                    where id = ${target_id}`,
+                    {type: QueryTypes.UPDATE}
                     );
             }
-            let statement = await this._DB.query(
+            await sequelize.query(
                 `update posts
                 set ${action} = array_append(${action}, ${personal_id})
                 where id = ${target_id}
-                returning array_length(${action}, 1)`
+                returning array_length(${action}, 1)`,
+                {type: QueryTypes.UPDATE}
                 );
             return {
                 "Status": 201, 
-                "Message": `User ${personal_id} ${action}d post ${target_id}, ${action} count: ${statement.rows[0].array_length}`
+                "Message": `User ${personal_id} ${action}d post ${target_id}`
             };
         } catch(err) {
             console.log(err);
@@ -185,4 +192,4 @@ class Posts {
     }
 }
 
-module.exports = new Posts();
+module.exports = new PostsServices();

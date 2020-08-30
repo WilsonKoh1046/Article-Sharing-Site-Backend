@@ -1,5 +1,5 @@
 const JWT = require("jsonwebtoken");
-const config = require("../config/configuration");
+const { secretKey } = require("../config/configuration");
 
 module.exports = async (req, res, next) => {
     const token = req.header("Authorization");
@@ -11,7 +11,7 @@ module.exports = async (req, res, next) => {
     const verifyToken = (provided_token) => {
         return new Promise((resolve, reject) => {
             try {
-                let verified = JWT.verify(provided_token, config.secretKey);
+                let verified = JWT.verify(provided_token, secretKey);
                 resolve(verified);
             } catch(err) {
                 reject(err);
